@@ -290,20 +290,22 @@ class Canvas:
 
 
 def png_bytes(cv):
-    raw = bytearray()
-    stride = cv.w * 3
-    for y in range(cv.h):
-        raw.append(0)  # filter: None
-        raw += cv.px[y * stride:(y + 1) * stride]
+    """Encode the canvas as a PNG: raw scanlines, one zlib stream."""
+    scanlines = bytearray()
+    row_bytes = cv.w * 3
+    for start in range(0, cv.h * row_bytes, row_bytes):
+        scanlines.append(0)  # filter type 0: no filtering
+        scanlines += cv.px[start:start + row_bytes]
 
     def chunk(kind, data):
-        out = struct.pack(">I", len(data)) + kind + data
-        out += struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
-        return out
+        packed = struct.pack(">I", len(data)) + kind + data
+        packed += struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+        return packed
 
-    ihdr = struct.pack(">IIBBBBB", cv.w, cv.h, 8, 2, 0, 0, 0)
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
-            + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
+    header = struct.pack(">IIBBBBB", cv.w, cv.h, 8, 2, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", header)
+            + chunk(b"IDAT", zlib.compress(bytes(scanlines), 9))
             + chunk(b"IEND", b""))
 
 
@@ -312,51 +314,64 @@ def png_bytes(cv):
 # ---------------------------------------------------------------------------
 def draw_turkey(cv, x0, y0, x1, y1):
     """A fanned-tail turkey in the given box."""
-    cv.rect(x0, y0, x1 - x0, y1 - y0, (250, 214, 150))
-    cv.rect(x0, y1 - 28, x1 - x0, 28, (190, 150, 90))
-    cx, cy = (x0 + x1) // 2, y0 + 118
-    fan = [RED, ORANGE, GOLD, BROWN, RED, ORANGE]
-    for i, col in enumerate(fan):
-        ang = math.radians(-62 + i * 25)
-        tx = cx + int(54 * math.sin(ang))
-        ty = cy - int(54 * math.cos(ang)) - 6
-        cv.circle(tx, ty, 27, col)
+    sky = (250, 214, 150)
+    ground = (190, 150, 90)
+    wing = (96, 56, 24)
+    cv.rect(x0, y0, x1 - x0, y1 - y0, sky)
+    cv.rect(x0, y1 - 28, x1 - x0, 28, ground)
+    cx = (x0 + x1) // 2
+    cy = y0 + 118
+    fan_cols = [RED, ORANGE, GOLD, BROWN, RED, ORANGE]
+    for step, col in enumerate(fan_cols):
+        ang = math.radians(-62 + step * 25)
+        fx = cx + int(54 * math.sin(ang))
+        fy = cy - int(54 * math.cos(ang)) - 6
+        cv.circle(fx, fy, 27, col)
     cv.ellipse(cx, cy + 32, 52, 58, BROWN)
-    cv.ellipse(cx - 20, cy + 38, 26, 36, (96, 56, 24))
+    cv.ellipse(cx - 20, cy + 38, 26, 36, wing)
     cv.circle(cx, cy - 46, 24, BROWN)
-    cv.polygon([(cx + 18, cy - 50), (cx + 18, cy - 38), (cx + 38, cy - 44)], ORANGE)
+    cv.polygon([(cx + 18, cy - 50), (cx + 18, cy - 38), (cx + 38, cy - 44)],
+               ORANGE)
     cv.ellipse(cx + 18, cy - 30, 6, 10, RED)
     cv.rect(cx - 4, cy - 54, 5, 5, INK)
-    cv.line(cx - 15, cy + 88, cx - 15, cy + 108, ORANGE, 3)
-    cv.line(cx + 15, cy + 88, cx + 15, cy + 108, ORANGE, 3)
+    for dx in (-15, 15):
+        cv.line(cx + dx, cy + 88, cx + dx, cy + 108, ORANGE, 3)
     cv.line(cx - 22, cy + 108, cx - 8, cy + 108, ORANGE, 3)
     cv.line(cx + 8, cy + 108, cx + 22, cy + 108, ORANGE, 3)
 
 
 def draw_eu_stars(cv, x0, y0, x1, y1):
     cv.rect(x0, y0, x1 - x0, y1 - y0, BLUE)
-    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
-    for i in range(12):
-        ang = -math.pi / 2 + i * math.pi / 6
-        cv.star(cx + int(34 * math.cos(ang)), cy + int(34 * math.sin(ang)), 6, GOLD)
+    cx = (x0 + x1) // 2
+    cy = (y0 + y1) // 2
+    for n in range(12):
+        ang = -math.pi / 2 + n * math.pi / 6
+        sx = cx + int(34 * math.cos(ang))
+        sy = cy + int(34 * math.sin(ang))
+        cv.star(sx, sy, 6, GOLD)
 
 
 def draw_india_flag(cv, x0, y0, x1, y1):
-    h = (y1 - y0) // 3
-    cv.rect(x0, y0, x1 - x0, h, (255, 153, 51))
-    cv.rect(x0, y0 + h, x1 - x0, h, WHITE)
-    cv.rect(x0, y0 + 2 * h, x1 - x0, y1 - y0 - 2 * h, (19, 136, 8))
-    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+    band = (y1 - y0) // 3
+    cv.rect(x0, y0, x1 - x0, band, (255, 153, 51))
+    cv.rect(x0, y0 + band, x1 - x0, band, WHITE)
+    cv.rect(x0, y0 + 2 * band, x1 - x0, y1 - y0 - 2 * band, (19, 136, 8))
+    cx = (x0 + x1) // 2
+    cy = (y0 + y1) // 2
     cv.ring(cx, cy, 12, NAVY, 2)
-    for i in range(8):
-        ang = i * math.pi / 4
-        cv.line(cx, cy, cx + int(12 * math.cos(ang)), cy + int(12 * math.sin(ang)), NAVY, 1)
+    for n in range(8):
+        ang = n * math.pi / 4
+        ex = cx + int(12 * math.cos(ang))
+        ey = cy + int(12 * math.sin(ang))
+        cv.line(cx, cy, ex, ey, NAVY, 1)
 
 
 def draw_ukraine_flag(cv, x0, y0, x1, y1):
     mid = (y0 + y1) // 2
-    cv.rect(x0, y0, x1 - x0, mid - y0, (0, 91, 187))
-    cv.rect(x0, mid, x1 - x0, y1 - mid, (255, 213, 0))
+    sky_blue = (0, 91, 187)
+    wheat = (255, 213, 0)
+    cv.rect(x0, y0, x1 - x0, mid - y0, sky_blue)
+    cv.rect(x0, mid, x1 - x0, y1 - mid, wheat)
     cx = (x0 + x1) // 2
     cv.text_centred(cx, y0 + 12, "NEARLY 500,000", 2, WHITE)
     cv.text_centred(cx, mid + 12, "LOST, BY MOSCOW'S OWN COUNT", 1, NAVY)
@@ -367,35 +382,37 @@ def draw_shirt(cv, x0, y0, x1, y1):
     cx = (x0 + x1) // 2
     cv.line(cx, y0 + 14, cx, y0 + 44, GREEN, 4)
     cv.polygon([(cx - 13, y0 + 38), (cx + 13, y0 + 38), (cx, y0 + 22)], GREEN)
-    shirt = [(cx - 38, y0 + 62), (cx + 38, y0 + 62), (cx + 56, y0 + 88),
-             (cx + 40, y0 + 102), (cx + 38, y0 + 158), (cx - 38, y0 + 158),
-             (cx - 40, y0 + 102), (cx - 56, y0 + 88)]
-    cv.polygon(shirt, WHITE)
-    for i in range(len(shirt)):
-        a, b = shirt[i], shirt[(i + 1) % len(shirt)]
+    offsets = [(-38, 62), (38, 62), (56, 88), (40, 102), (38, 158),
+               (-38, 158), (-40, 102), (-56, 88)]
+    outline = [(cx + dx, y0 + dy) for dx, dy in offsets]
+    cv.polygon(outline, WHITE)
+    for n in range(len(outline)):
+        a = outline[n]
+        b = outline[(n + 1) % len(outline)]
         cv.line(a[0], a[1], b[0], b[1], INK, 2)
     cv.text_centred(cx, y0 + 168, "36%", 3, GREEN)
 
 
 def draw_chessboard(cv, x0, y0, x1, y1):
     cv.rect(x0, y0, x1 - x0, y1 - y0, LIGHT)
-    s = 18
-    bx, by = x0 + (x1 - x0 - 8 * s) // 2, y0 + 8
-    for r in range(8):
-        for c in range(8):
-            if (r + c) % 2 == 0:
-                cv.rect(bx + c * s, by + r * s, s, s, WHITE)
-            else:
-                cv.rect(bx + c * s, by + r * s, s, s, INK)
-    kx, ky = bx + 4 * s + s // 2, by + 7 * s + s // 2
+    cell = 18
+    bx = x0 + (x1 - x0 - 8 * cell) // 2
+    by = y0 + 8
+    for row in range(8):
+        for col in range(8):
+            shade = WHITE if (row + col) % 2 == 0 else INK
+            cv.rect(bx + col * cell, by + row * cell, cell, cell, shade)
+    kx = bx + 4 * cell + cell // 2
+    ky = by + 7 * cell + cell // 2
     cv.circle(kx, ky, 8, WHITE)
     cv.ring(kx, ky, 8, INK, 2)
     cv.line(kx - 4, ky, kx + 4, ky, INK, 2)
     cv.line(kx, ky - 4, kx, ky + 4, INK, 2)
-    px, py = bx + 2 * s + s // 2, by + 1 * s + s // 2
+    px = bx + 2 * cell + cell // 2
+    py = by + 1 * cell + cell // 2
     cv.circle(px, py, 8, INK)
     cv.ring(px, py, 8, WHITE, 1)
-    cv.text_centred((x0 + x1) // 2, by + 8 * s + 8, "GENEVA", 2, INK)
+    cv.text_centred((x0 + x1) // 2, by + 8 * cell + 8, "GENEVA", 2, INK)
 
 
 # ---------------------------------------------------------------------------

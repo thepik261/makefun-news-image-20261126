@@ -155,13 +155,15 @@ LIGHT = (238, 232, 216)
 
 class Canvas:
     def __init__(self, w, h, bg):
-        self.w, self.h = w, h
+        self.w = w
+        self.h = h
         self.px = bytearray(bg) * (w * h)
 
     def set(self, x, y, c):
-        if 0 <= x < self.w and 0 <= y < self.h:
-            i = (y * self.w + x) * 3
-            self.px[i], self.px[i + 1], self.px[i + 2] = c
+        if not (0 <= x < self.w and 0 <= y < self.h):
+            return
+        i = (y * self.w + x) * 3
+        self.px[i], self.px[i + 1], self.px[i + 2] = c
 
     def rect(self, x, y, w, h, c):
         x0, y0 = max(0, x), max(0, y)
@@ -250,42 +252,37 @@ class Canvas:
 
     # -- text ---------------------------------------------------------------
     def text_width(self, s, scale):
-        return len(s) * 6 * scale - scale if s else 0
+        if not s:
+            return 0
+        return (len(s) * 6 - 1) * scale
+
+    def _stamp(self, x, y, glyph, scale, c):
+        for row, bits in enumerate(glyph):
+            for col, bit in enumerate(bits):
+                if bit == "#":
+                    self.rect(x + col * scale, y + row * scale,
+                              scale, scale, c)
 
     def text(self, x, y, s, scale, c):
-        cx = x
+        pen = x
         for ch in s:
             glyph = FONT.get(ch)
-            if glyph is None:
-                cx += 6 * scale
-                continue
-            for row, bits in enumerate(glyph):
-                for col, bit in enumerate(bits):
-                    if bit == "#":
-                        self.rect(cx + col * scale, y + row * scale,
-                                  scale, scale, c)
-            cx += 6 * scale
-        return cx
+            if glyph is not None:
+                self._stamp(pen, y, glyph, scale, c)
+            pen += 6 * scale
+        return pen
 
     def text_centred(self, cx, y, s, scale, c):
-        self.text(cx - self.text_width(s, scale) // 2, y, s, scale, c)
+        start = cx - self.text_width(s, scale) // 2
+        self.text(start, y, s, scale, c)
 
     def text_wrapped(self, x, y, s, max_w, scale, c, leading=None):
         """Word-wrap s into lines of at most max_w px; returns y after text."""
-        leading = leading or int(9 * scale)
-        words, lines, cur = s.split(" "), [], ""
-        for word in words:
-            trial = (cur + " " + word).strip()
-            if self.text_width(trial, scale) <= max_w or not cur:
-                cur = trial
-            else:
-                lines.append(cur)
-                cur = word
-        if cur:
-            lines.append(cur)
+        gap = leading if leading is not None else int(9 * scale)
+        lines = wrap_text(self, s, max_w, scale)
         for line in lines:
             self.text(x, y, line, scale, c)
-            y += leading
+            y += gap
         return y
 
 
@@ -598,6 +595,20 @@ def draw_ticker(cv):
     cv.text_centred(W // 2, 984, CREDIT, 1, GREY)
 
 
+def verify_png(path):
+    """Check the written file is a whole 1024x1024 PNG under the 1 MiB cap."""
+    with open(path, "rb") as handle:
+        data = handle.read()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit("not a PNG: " + path)
+    w, h = struct.unpack(">II", data[16:24])
+    if (w, h) != (1024, 1024):
+        raise SystemExit(f"wrong size: {w}x{h}")
+    if len(data) > 1024 * 1024:
+        raise SystemExit(f"over the 1 MiB cap: {len(data)} bytes")
+    return len(data)
+
+
 def main():
     outdir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
     os.makedirs(outdir, exist_ok=True)
@@ -607,7 +618,8 @@ def main():
     target = os.path.join(outdir, "entry.png")
     with open(target, "wb") as handle:
         handle.write(data)
-    print(f"wrote {target}: {W}x{H} PNG, {len(data)} bytes")
+    size = verify_png(target)
+    print(f"wrote {target}: {W}x{H} PNG, {size} bytes")
 
 
 if __name__ == "__main__":

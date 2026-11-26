@@ -1,28 +1,29 @@
 #!/usr/bin/env python3
-"""News image for 26 November 2026 -- make.fun bounty news-image-20261126.
+"""Front page for 26 November 2026 -- make.fun bounty news-image-20261126.
 
-Pure Python standard library. Draws a one-page newspaper front page that sums
-up the world news of Thursday 26 November 2026 and writes it to
-$MAKEFUN_OUTPUT_DIR/entry.png (default /output/entry.png) as a 1024x1024 PNG.
+A pure-stdlib Python program. It draws a one-page newspaper front page
+that sums up the world news of Thursday 26 November 2026 and saves it as
+a 1024x1024 PNG at $MAKEFUN_OUTPUT_DIR/entry.png (/output/entry.png when
+the variable is unset).
 
-The stories were researched from reports published on 26 November 2026
-(Reuters, BBC, Financial Times, ESA, Xinhua and the day's wire round-ups):
-  * Thanksgiving Day in the United States (Thursday 26 November 2026).
-  * A special European Council and a Euro Summit open in Brussels, focused
+The day's stories, checked against reporting published around 26 November
+2026 (Reuters, BBC, Financial Times, ESA, Xinhua and the wires):
+  * Thanksgiving Day in the United States, Thursday 26 November 2026.
+  * A special European Council and Euro Summit open in Brussels, centred
     on the 2028-2034 EU budget and financing for Ukraine.
   * India marks Constitution Day; Modi meets Germany's Chancellor Merz and
-    New Delhi unveils a Rs 15,000-crore package for Nepal.
-  * Leaked Rosstat records analysed by the BBC put Russia's war dead at
-    nearly 500,000; the US shelves a plan to trade business deals for peace.
-  * Bangladesh raises the minimum wage for garment workers by 36%.
-  * World Chess Championship in Geneva: Gukesh vs Sindarov.
-  * Also: Mumbai marks 18 years since the 26/11 attacks; North Korea orders
-    Switzerland to shut its Pyongyang office; 1,220 players register for the
-    IPL auction; Real Madrid rout PSV in the Champions League.
+    New Delhi announces a Rs 15,000-crore package for Nepal.
+  * Leaked Rosstat records, analysed by the BBC, put Russia's war dead at
+    nearly 500,000.
+  * Bangladesh lifts the minimum wage for garment workers by 36%.
+  * World Chess Championship in Geneva: Gukesh against Sindarov.
+  * Also noted: Mumbai marks 18 years since the 26/11 attacks; North
+    Korea orders Switzerland to shut its Pyongyang office; 1,220 players
+    register for the IPL auction; Real Madrid rout PSV.
 
-Everything is drawn with a hand-built 5x7 bitmap font and a tiny PNG encoder
-(zlib + struct). No network, no randomness, no third-party code: two runs
-produce byte-identical output.
+The picture is painted with a hand-built 5x7 bitmap font and a small PNG
+encoder written on zlib and struct. No network, no randomness, no
+third-party code: running it twice writes byte-identical files.
 """
 
 import math
@@ -398,116 +399,198 @@ def draw_chessboard(cv, x0, y0, x1, y1):
 
 
 # ---------------------------------------------------------------------------
-# The front page.
+# Front page. Stories are data; one renderer draws them all, so the page
+# can grow without touching the drawing code.
 # ---------------------------------------------------------------------------
-def draw_page(cv):
+
+MARGIN = 24
+CONTENT_W = 976
+ROW_Y = 434
+ROW_H = 256
+PANEL_W = 312
+BODY_W = 288
+
+TITLE = "THE WORLD IN ONE DAY"
+DATE_LINE = "THURSDAY, 26 NOVEMBER 2026"
+LEFT_STRAP = "ONE DAY - ONE IMAGE"
+RIGHT_STRAP = "THE WORLD'S NEWS"
+
+LEAD_STORY = {
+    "kicker": "THANKSGIVING DAY - UNITED STATES",
+    "lines": ("AMERICA GIVES", "THANKS"),
+    "body": (
+        "Thanksgiving falls on Thursday 26 November this year. "
+        "Families gather from coast to coast for the harvest holiday, "
+        "with travel, turkey and the parade, as the United States "
+        "pauses to give thanks."
+    ),
+}
+
+MIDDLE_STORIES = [
+    {
+        "x": 24,
+        "kicker": "EUROPE - BRUSSELS",
+        "lines": ("EU LEADERS MEET", "IN BRUSSELS"),
+        "body": (
+            "EU leaders open a special summit in Brussels on the "
+            "budget and Ukraine financing."
+        ),
+        "art": draw_eu_stars,
+    },
+    {
+        "x": 356,
+        "kicker": "ASIA - NEW DELHI",
+        "lines": ("INDIA MARKS", "CONSTITUTION DAY"),
+        "body": (
+            "India marks Samvidhan Divas. Modi meets Merz; Delhi "
+            "pledges Rs 15,000 crore to Nepal."
+        ),
+        "art": draw_india_flag,
+    },
+    {
+        "x": 688,
+        "kicker": "THE WAR IN UKRAINE",
+        "lines": ("MOSCOW COUNTS", "ITS WAR DEAD"),
+        "body": (
+            "Leaked Rosstat records analysed by the BBC put "
+            "Russia's war dead at nearly 500,000."
+        ),
+        "art": draw_ukraine_flag,
+    },
+]
+
+
+def draw_masthead(cv):
     cv.rect(0, 0, W, H, PAPER)
+    cv.text_centred(W // 2, 20, TITLE, 6, INK)
+    cv.rect(MARGIN, 70, CONTENT_W, 4, RED)
+    cv.text_centred(W // 2, 82, DATE_LINE, 3, INK)
+    cv.text(MARGIN, 112, LEFT_STRAP, 2, GREY)
+    cv.text(W - MARGIN - cv.text_width(RIGHT_STRAP, 2), 112,
+            RIGHT_STRAP, 2, GREY)
+    cv.hline(MARGIN, 134, CONTENT_W, INK, 2)
 
-    # Masthead.
-    cv.text_centred(W // 2, 20, "THE WORLD IN ONE DAY", 6, INK)
-    cv.rect(24, 70, 976, 4, RED)
-    cv.text_centred(W // 2, 82, "THURSDAY, 26 NOVEMBER 2026", 3, INK)
-    cv.text(24, 112, "ONE DAY - ONE IMAGE", 2, GREY)
-    right = "THE WORLD'S NEWS"
-    cv.text(1000 - cv.text_width(right, 2), 112, right, 2, GREY)
-    cv.hline(24, 134, 976, INK, 2)
 
-    # Lead story: Thanksgiving.
-    cv.frame(24, 146, 976, 272, INK, 3)
-    cv.text(44, 162, "THANKSGIVING DAY - UNITED STATES", 2, RED)
-    cv.text(44, 186, "AMERICA GIVES", 5, INK)
-    cv.text(44, 226, "THANKS", 5, INK)
-    cv.text_wrapped(
-        44, 276,
-        "Thanksgiving falls on Thursday 26 November this year. Families "
-        "gather from coast to coast for the harvest holiday, with travel, "
-        "turkey and the parade, as the United States pauses to give thanks.",
-        600, 2, INK)
-    draw_turkey(cv, 660, 166, 980, 398)
+def draw_lead(cv):
+    top, height = 146, 272
+    cv.frame(MARGIN, top, CONTENT_W, height, INK, 3)
+    cv.text(MARGIN + 20, top + 16, LEAD_STORY["kicker"], 2, RED)
+    y = top + 40
+    for line in LEAD_STORY["lines"]:
+        cv.text(MARGIN + 20, y, line, 5, INK)
+        y += 40
+    cv.text_wrapped(MARGIN + 20, top + 130, LEAD_STORY["body"], 600, 2, INK)
+    draw_turkey(cv, MARGIN + 636, top + 20, MARGIN + 956, top + 252)
 
-    # Row of three stories.
-    panels = [
-        (24, "EUROPE - BRUSSELS", ("EU LEADERS MEET", "IN BRUSSELS"),
-         "EU leaders open a special summit in Brussels on the budget and "
-         "Ukraine financing.", draw_eu_stars),
-        (356, "ASIA - NEW DELHI", ("INDIA MARKS", "CONSTITUTION DAY"),
-         "India marks Samvidhan Divas. Modi meets Merz; Delhi pledges "
-         "Rs 15,000 crore to Nepal.", draw_india_flag),
-        (688, "THE WAR IN UKRAINE", ("MOSCOW COUNTS", "ITS WAR DEAD"),
-         "Leaked Rosstat records analysed by the BBC put Russia's war "
-         "dead at nearly 500,000.", draw_ukraine_flag),
-    ]
-    for px, kicker, headline, body, art in panels:
-        cv.frame(px, 434, 312, 256, INK, 2)
-        art(cv, px + 2, 436, px + 310, 522)
-        cv.text(px + 12, 530, kicker, 2, RED)
-        y = 552
-        for line in headline:
-            cv.text(px + 12, y, line, 3, INK)
+
+def draw_middle_row(cv):
+    for story in MIDDLE_STORIES:
+        x = story["x"]
+        cv.frame(x, ROW_Y, PANEL_W, ROW_H, INK, 2)
+        story["art"](cv, x + 2, ROW_Y + 2, x + 310, ROW_Y + 88)
+        cv.text(x + 12, ROW_Y + 96, story["kicker"], 2, RED)
+        y = ROW_Y + 118
+        for line in story["lines"]:
+            cv.text(x + 12, y, line, 3, INK)
             y += 22
-        cv.text_wrapped(px + 12, 602, body, 288, 2, INK)
+        cv.text_wrapped(x + 12, ROW_Y + 168, story["body"], BODY_W, 2, INK)
 
-    # Row of two stories.
-    cv.frame(24, 706, 478, 200, INK, 2)
-    draw_shirt(cv, 26, 708, 174, 904)
-    cv.text(188, 722, "ASIA - DHAKA", 2, RED)
-    cv.text(188, 744, "GARMENT WORKERS", 3, INK)
-    cv.text(188, 766, "WIN 36% PAY RISE", 3, INK)
-    cv.text_wrapped(
-        188, 796,
-        "Bangladesh raises the minimum wage for garment workers by 36 "
-        "percent, a lift for millions in its biggest export industry.",
-        302, 2, INK)
 
-    cv.frame(522, 706, 478, 200, INK, 2)
-    draw_chessboard(cv, 524, 708, 672, 904)
-    cv.text(686, 722, "SPORT - GENEVA", 2, RED)
-    cv.text(686, 744, "GUKESH DEFENDS", 3, INK)
-    cv.text(686, 766, "HIS CROWN", 3, INK)
-    cv.text_wrapped(
-        686, 796,
-        "World champion D. Gukesh faces Javokhir Sindarov in Geneva as "
-        "the World Chess Championship match plays on.",
-        302, 2, INK)
+def draw_page(cv):
+    draw_masthead(cv)
+    draw_lead(cv)
+    draw_middle_row(cv)
+    draw_lower_row(cv)
+    draw_ticker(cv)
 
-    # Ticker.
-    cv.rect(24, 918, 976, 56, INK)
-    ticker = ("ALSO TODAY: MUMBAI MARKS 18 YEARS SINCE 26/11 | NORTH KOREA "
-              "ORDERS SWITZERLAND TO SHUT ITS PYONGYANG OFFICE | IPL AUCTION: "
-              "1,220 PLAYERS | REAL MADRID ROUT PSV")
-    words, lines, cur = ticker.split(" "), [], ""
+LOWER_STORIES = [
+    {
+        "x": 24,
+        "art_box": (26, 708, 174, 904),
+        "art": draw_shirt,
+        "kicker": "ASIA - DHAKA",
+        "lines": ("GARMENT WORKERS", "WIN 36% PAY RISE"),
+        "body": (
+            "Bangladesh raises the minimum wage for garment workers "
+            "by 36 percent, a lift for millions in its biggest "
+            "export industry."
+        ),
+    },
+    {
+        "x": 522,
+        "art_box": (524, 708, 672, 904),
+        "art": draw_chessboard,
+        "kicker": "SPORT - GENEVA",
+        "lines": ("GUKESH DEFENDS", "HIS CROWN"),
+        "body": (
+            "World champion D. Gukesh faces Javokhir Sindarov in "
+            "Geneva as the World Chess Championship match plays on."
+        ),
+    },
+]
+
+TICKER_ITEMS = (
+    "MUMBAI MARKS 18 YEARS SINCE 26/11",
+    "NORTH KOREA ORDERS SWITZERLAND TO SHUT ITS PYONGYANG OFFICE",
+    "IPL AUCTION: 1,220 PLAYERS",
+    "REAL MADRID ROUT PSV",
+)
+
+CREDIT = (
+    "SOURCES: REUTERS, BBC, FINANCIAL TIMES, ESA, XINHUA - "
+    "REPORTS OF 26 NOVEMBER 2026"
+)
+
+
+def draw_lower_row(cv):
+    for story in LOWER_STORIES:
+        x = story["x"]
+        cv.frame(x, 706, 478, 200, INK, 2)
+        story["art"](cv, *story["art_box"])
+        tx = x + 164
+        cv.text(tx, 722, story["kicker"], 2, RED)
+        y = 744
+        for line in story["lines"]:
+            cv.text(tx, y, line, 3, INK)
+            y += 22
+        cv.text_wrapped(tx, 796, story["body"], 302, 2, INK)
+
+
+def wrap_text(cv, text, width, scale):
+    words, lines, cur = text.split(" "), [], ""
     for word in words:
         trial = (cur + " " + word).strip()
-        if cv.text_width(trial, 2) <= 970 or not cur:
+        if cv.text_width(trial, scale) <= width or not cur:
             cur = trial
         else:
             lines.append(cur)
             cur = word
     if cur:
         lines.append(cur)
-    lines = lines[:2]  # the black band holds exactly two lines
+    return lines
+
+
+def draw_ticker(cv):
+    cv.rect(MARGIN, 918, CONTENT_W, 56, INK)
+    ticker = "ALSO TODAY: " + " | ".join(TICKER_ITEMS)
+    lines = wrap_text(cv, ticker, 970, 2)[:2]
     y = 928
     for line in lines:
         cv.text_centred(W // 2, y, line, 2, WHITE)
         y += 18
-
-    # Credit line.
-    cv.text_centred(
-        W // 2, 984,
-        "SOURCES: REUTERS, BBC, FINANCIAL TIMES, ESA, XINHUA - REPORTS OF "
-        "26 NOVEMBER 2026", 1, GREY)
+    cv.text_centred(W // 2, 984, CREDIT, 1, GREY)
 
 
 def main():
     outdir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
     os.makedirs(outdir, exist_ok=True)
-    cv = Canvas(W, H, PAPER)
-    draw_page(cv)
-    data = png_bytes(cv)
-    path = os.path.join(outdir, "entry.png")
-    with open(path, "wb") as f:
-        f.write(data)
-    print(f"wrote {path}: {W}x{H} PNG, {len(data)} bytes")
+    page = Canvas(W, H, PAPER)
+    draw_page(page)
+    data = png_bytes(page)
+    target = os.path.join(outdir, "entry.png")
+    with open(target, "wb") as handle:
+        handle.write(data)
+    print(f"wrote {target}: {W}x{H} PNG, {len(data)} bytes")
 
 
 if __name__ == "__main__":

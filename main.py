@@ -166,18 +166,20 @@ class Canvas:
         self.px[i], self.px[i + 1], self.px[i + 2] = c
 
     def rect(self, x, y, w, h, c):
-        x0, y0 = max(0, x), max(0, y)
-        x1, y1 = min(self.w, x + w), min(self.h, y + h)
-        for yy in range(y0, y1):
-            i = (yy * self.w + x0) * 3
-            row = bytes(c) * (x1 - x0)
-            self.px[i:i + (x1 - x0) * 3] = row
+        left = max(0, x)
+        top = max(0, y)
+        right = min(self.w, x + w)
+        bottom = min(self.h, y + h)
+        fill = bytes(c) * (right - left)
+        for yy in range(top, bottom):
+            i = (yy * self.w + left) * 3
+            self.px[i:i + (right - left) * 3] = fill
 
     def frame(self, x, y, w, h, c, t=2):
         self.rect(x, y, w, t, c)
         self.rect(x, y + h - t, w, t, c)
-        self.rect(x, y, t, h, c)
-        self.rect(x + w - t, y, t, h, c)
+        self.rect(x, y + t, t, h - 2 * t, c)
+        self.rect(x + w - t, y + t, t, h - 2 * t, c)
 
     def hline(self, x, y, w, c, t=1):
         self.rect(x, y, w, t, c)
